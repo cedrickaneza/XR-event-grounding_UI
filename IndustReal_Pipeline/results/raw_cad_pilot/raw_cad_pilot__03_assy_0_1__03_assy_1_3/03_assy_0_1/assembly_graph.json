@@ -1,0 +1,37 @@
+{
+  "clip": "03_assy_0_1",
+  "n_frames": 1251,
+  "events": [
+    {
+      "event_id": 0,
+      "frame": 1187,
+      "time_s": 118.7,
+      "event_type": "INSTALL",
+      "component": "front chassis",
+      "action_desc": "Install front chassis",
+      "conf": 1.0
+    },
+    {
+      "event_id": 1,
+      "frame": 1187,
+      "time_s": 118.7,
+      "event_type": "INSTALL",
+      "component": "front chassis pin",
+      "action_desc": "Install front chassis pin",
+      "conf": 1.0
+    }
+  ],
+  "component_states": {
+    "base": null,
+    "front chassis": true,
+    "front chassis pin": true,
+    "rear chassis": null,
+    "short rear chassis": null,
+    "front rear chassis pin": null,
+    "rear rear chassis pin": null,
+    "front bracket": null,
+    "front bracket screw": null,
+    "front wheel assy": null,
+    "rear wheel assy": null
+  }
+}

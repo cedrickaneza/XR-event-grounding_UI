@@ -1,0 +1,12 @@
+component_id:ID(Component),display_name,name,normalized_name,:LABEL
+industreal_component::base,base,base,base,Component;IndustRealComponent
+industreal_component::front_bracket,front bracket,front bracket,front_bracket,Component;IndustRealComponent
+industreal_component::front_bracket_screw,front bracket screw,front bracket screw,front_bracket_screw,Component;IndustRealComponent
+industreal_component::front_chassis,front chassis,front chassis,front_chassis,Component;IndustRealComponent
+industreal_component::front_chassis_pin,front chassis pin,front chassis pin,front_chassis_pin,Component;IndustRealComponent
+industreal_component::front_rear_chassis_pin,front rear chassis pin,front rear chassis pin,front_rear_chassis_pin,Component;IndustRealComponent
+industreal_component::front_wheel_assy,front wheel assy,front wheel assy,front_wheel_assy,Component;IndustRealComponent
+industreal_component::rear_chassis,rear chassis,rear chassis,rear_chassis,Component;IndustRealComponent
+industreal_component::rear_rear_chassis_pin,rear rear chassis pin,rear rear chassis pin,rear_rear_chassis_pin,Component;IndustRealComponent
+industreal_component::rear_wheel_assy,rear wheel assy,rear wheel assy,rear_wheel_assy,Component;IndustRealComponent
+industreal_component::short_rear_chassis,short rear chassis,short rear chassis,short_rear_chassis,Component;IndustRealComponent

@@ -1,0 +1,172 @@
+{
+  "clip": "03_assy_0_1",
+  "n_frames": 2754,
+  "duration_s": 275.4,
+  "has_pred": true,
+  "metrics": {
+    "pos": 1.0,
+    "f1": 1.0,
+    "avg_delay_s": 2.97,
+    "system_TPs": 9,
+    "system_FPs": 0,
+    "system_FNs": 0
+  },
+  "gt_steps": [
+    {
+      "frame": 709,
+      "time_s": 70.9,
+      "id": 9,
+      "description": "Install rear chassis",
+      "conf": 1.0
+    },
+    {
+      "frame": 709,
+      "time_s": 70.9,
+      "id": 15,
+      "description": "Install front rear chassis pin",
+      "conf": 1.0
+    },
+    {
+      "frame": 709,
+      "time_s": 70.9,
+      "id": 18,
+      "description": "Install rear rear chassis pin",
+      "conf": 1.0
+    },
+    {
+      "frame": 1187,
+      "time_s": 118.7,
+      "id": 3,
+      "description": "Install front chassis",
+      "conf": 1.0
+    },
+    {
+      "frame": 1187,
+      "time_s": 118.7,
+      "id": 6,
+      "description": "Install front chassis pin",
+      "conf": 1.0
+    },
+    {
+      "frame": 1788,
+      "time_s": 178.8,
+      "id": 30,
+      "description": "Install rear wheel assy",
+      "conf": 1.0
+    },
+    {
+      "frame": 2735,
+      "time_s": 273.5,
+      "id": 21,
+      "description": "Install front bracket",
+      "conf": 1.0
+    },
+    {
+      "frame": 2735,
+      "time_s": 273.5,
+      "id": 24,
+      "description": "Install front bracket screw",
+      "conf": 1.0
+    },
+    {
+      "frame": 2735,
+      "time_s": 273.5,
+      "id": 27,
+      "description": "Install front wheel assy",
+      "conf": 1.0
+    }
+  ],
+  "pred_steps": [
+    {
+      "frame": 727,
+      "time_s": 72.7,
+      "id": 9,
+      "description": "Install rear chassis",
+      "conf": 1.0
+    },
+    {
+      "frame": 727,
+      "time_s": 72.7,
+      "id": 15,
+      "description": "Install front rear chassis pin",
+      "conf": 1.0
+    },
+    {
+      "frame": 727,
+      "time_s": 72.7,
+      "id": 18,
+      "description": "Install rear rear chassis pin",
+      "conf": 1.0
+    },
+    {
+      "frame": 1277,
+      "time_s": 127.7,
+      "id": 3,
+      "description": "Install front chassis",
+      "conf": 1.0
+    },
+    {
+      "frame": 1277,
+      "time_s": 127.7,
+      "id": 6,
+      "description": "Install front chassis pin",
+      "conf": 1.0
+    },
+    {
+      "frame": 1803,
+      "time_s": 180.3,
+      "id": 30,
+      "description": "Install rear wheel assy",
+      "conf": 1.0
+    },
+    {
+      "frame": 2741,
+      "time_s": 274.1,
+      "id": 21,
+      "description": "Install front bracket",
+      "conf": 1.0
+    },
+    {
+      "frame": 2741,
+      "time_s": 274.1,
+      "id": 24,
+      "description": "Install front bracket screw",
+      "conf": 1.0
+    },
+    {
+      "frame": 2741,
+      "time_s": 274.1,
+      "id": 27,
+      "description": "Install front wheel assy",
+      "conf": 1.0
+    }
+  ],
+  "component_states": {
+    "gt": {
+      "base": null,
+      "front chassis": true,
+      "front chassis pin": true,
+      "rear chassis": true,
+      "short rear chassis": null,
+      "front rear chassis pin": true,
+      "rear rear chassis pin": true,
+      "front bracket": true,
+      "front bracket screw": true,
+      "front wheel assy": true,
+      "rear wheel assy": true
+    },
+    "pred": {
+      "base": null,
+      "front chassis": true,
+      "front chassis pin": true,
+      "rear chassis": true,
+      "short rear chassis": null,
+      "front rear chassis pin": true,
+      "rear rear chassis pin": true,
+      "front bracket": true,
+      "front bracket screw": true,
+      "front wheel assy": true,
+      "rear wheel assy": true
+    }
+  }
+}
