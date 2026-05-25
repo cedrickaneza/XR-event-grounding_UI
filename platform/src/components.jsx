@@ -30,7 +30,7 @@ function Icon({ name, size = 16 }) {
 // ---------------------------------------------------------------------------
 // Topbar
 // ---------------------------------------------------------------------------
-function Topbar({ tab, onTab, clipId, onOpenProviders, aiOn, onAiToggle, llmLabel, voiceLabel }) {
+function Topbar({ tab, onTab, clipId, onOpenProviders, aiOn, onAiToggle, ttsEnabled, onTtsToggle, llmLabel, voiceLabel }) {
   return (
     <header className="topbar">
       <div className="wm">
@@ -52,6 +52,12 @@ function Topbar({ tab, onTab, clipId, onOpenProviders, aiOn, onAiToggle, llmLabe
         <span className="pill" onClick={onOpenProviders} title={"Voice · " + voiceLabel} style={{ cursor: "pointer" }}>
           voice · {voiceLabel}
         </span>
+        <div className="pair">
+          <span className="mono-caps">Voice</span>
+          <div className={"toggle" + (ttsEnabled ? " on" : "")} onClick={onTtsToggle} title={ttsEnabled ? "Mute AI voice" : "Unmute AI voice"}>
+            <div className="dot" />
+          </div>
+        </div>
         <div className="pair">
           <span className="mono-caps">AI Agent</span>
           <div className={"toggle" + (aiOn ? " on" : "")} onClick={onAiToggle}>
@@ -464,7 +470,129 @@ function truncate(s, n) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
 // ---------------------------------------------------------------------------
 // Provider drawer (open-architecture switcher)
 // ---------------------------------------------------------------------------
-function ProviderDrawer({ open, onClose, llmId, onLlm, voiceId, onVoice, voiceMode, onVoiceMode, llmKey, onLlmKey, voiceKey, onVoiceKey, llmEndpoint, onLlmEndpoint }) {
+// ---------------------------------------------------------------------------
+// Conversational agent floating button
+// ---------------------------------------------------------------------------
+function ConvAgentButton({ agentId, apiKey, tools, dynamicVars, onTranscript, onAgentText }) {
+  const [status, setStatus] = React.useState('idle');
+  const [mode,   setMode]   = React.useState(null);
+  const [errMsg, setErrMsg] = React.useState('');
+
+  const isActive = status === 'connected' || status === 'connecting';
+
+  async function handleClick() {
+    if (isActive || status === 'error') {
+      window.ConvAgent.stop();
+      setStatus('idle');
+      setMode(null);
+      setErrMsg('');
+    } else {
+      setErrMsg('');
+      await window.ConvAgent.start(agentId, apiKey, {
+        onStatus: setStatus,
+        onMode:   setMode,
+        onTranscript,
+        onAgentText,
+        onError:  setErrMsg,
+        tools,
+        dynamicVars,
+      });
+    }
+  }
+
+  const orbState =
+    status === 'error'      ? 'error'      :
+    status === 'connecting' ? 'connecting' :
+    mode   === 'speaking'   ? 'speaking'   :
+    mode   === 'thinking'   ? 'thinking'   :
+    mode   === 'listening'  ? 'listening'  : 'idle';
+
+  const label =
+    status === 'connecting' ? 'Connecting…'          :
+    status === 'error'      ? 'Error — tap to close' :
+    mode   === 'thinking'   ? 'Thinking…'            :
+    mode   === 'speaking'   ? 'Speaking…'            :
+    mode   === 'listening'  ? 'Listening…'           :
+    isActive                ? 'Connected'            : 'Talk to an agent';
+
+  return (
+    <button
+      className={'conv-agent-btn' + (isActive ? ' active' : '') + (status === 'error' ? ' err' : '')}
+      onClick={handleClick}
+      title={errMsg || label}
+    >
+      <div className={'conv-orb ' + orbState} />
+      <span>{label}</span>
+      {isActive && (
+        <svg className="x-icon" width="13" height="13" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" strokeWidth="2.5">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6"  y1="6" x2="18" y2="18" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+function ConvAgentDrawerGroup({ convAgentId, onConvAgentId, voiceKey }) {
+  const [state, setState] = React.useState("idle"); // idle | working | ok | err
+  const [msg,   setMsg]   = React.useState("");
+
+  async function configure() {
+    if (!convAgentId.trim()) { setMsg("Enter an Agent ID first."); setState("err"); return; }
+    if (!voiceKey.trim())    { setMsg("Set your ElevenLabs API key above first."); setState("err"); return; }
+    setState("working"); setMsg("");
+    try {
+      const r = await window.ConvAgent.configureAgent(convAgentId.trim(), voiceKey.trim());
+      if (r.alreadyConfigured) {
+        setMsg("Already configured.");
+      } else {
+        const parts = [];
+        if (r.toolsAdded?.length) parts.push("Tools added");
+        if (r.promptUpdated)      parts.push("Prompt updated");
+        setMsg(parts.join(" · ") + " ✓");
+      }
+      setState("ok");
+    } catch (e) {
+      setMsg(e.message);
+      setState("err");
+    }
+  }
+
+  return (
+    <div className="group">
+      <div className="label">Conversational Agent</div>
+      <div className="mono-xs fg-3" style={{ marginBottom: 8 }}>
+        Enter your ElevenLabs Agent ID, then click Auto-configure to add navigation tools automatically.
+      </div>
+      <div className="field">
+        <div className="label">Agent ID</div>
+        <input
+          value={convAgentId}
+          onChange={(e) => { onConvAgentId(e.target.value); setState("idle"); setMsg(""); }}
+          placeholder="agt_•••"
+        />
+      </div>
+      <div className="flex gap-2" style={{ marginTop: 8, alignItems: "center" }}>
+        <button
+          className={"btn" + (state === "ok" ? " primary" : "")}
+          onClick={configure}
+          disabled={state === "working"}
+          style={{ flexShrink: 0 }}
+        >
+          {state === "working" ? "Configuring…" : state === "ok" ? "✓ Done" : "Auto-configure"}
+        </button>
+        {msg && (
+          <span className="mono-xs" style={{ color: state === "err" ? "var(--fail)" : "var(--ok)", flex: 1 }}>
+            {msg}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProviderDrawer({ open, onClose, llmId, onLlm, voiceId, onVoice, voiceMode, onVoiceMode, llmKey, onLlmKey, voiceKey, onVoiceKey, llmEndpoint, onLlmEndpoint, convAgentId, onConvAgentId }) {
   if (!open) return null;
   const llms = window.Providers.LLM.list();
   const voices = window.Providers.TTS.list();
@@ -545,6 +673,12 @@ function ProviderDrawer({ open, onClose, llmId, onLlm, voiceId, onVoice, voiceMo
               Push-to-talk: hold the mic. Always-on: tap to start a listening session.
             </div>
           </div>
+
+          <ConvAgentDrawerGroup
+            convAgentId={convAgentId}
+            onConvAgentId={onConvAgentId}
+            voiceKey={voiceKey}
+          />
         </div>
       </aside>
     </React.Fragment>
@@ -552,5 +686,5 @@ function ProviderDrawer({ open, onClose, llmId, onLlm, voiceId, onVoice, voiceMo
 }
 
 Object.assign(window, {
-  Topbar, StepsPanel, VideoPanel, ChatPanel, Message, ProviderDrawer, Icon,
+  Topbar, StepsPanel, VideoPanel, ChatPanel, Message, ProviderDrawer, ConvAgentButton, Icon,
 });

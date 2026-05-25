@@ -20,7 +20,7 @@
 const { useEffect, useMemo, useRef, useState } = React;
 const {
   Topbar, StepsPanel, VideoPanel, ChatPanel, ProviderDrawer,
-  GraphViz, GraphOverlay,
+  ConvAgentButton, GraphViz, GraphOverlay,
 } = window;
 
 function App() {
@@ -31,6 +31,43 @@ function App() {
 
   const firstEventId = useMemo(() => graph.eventsInOrder()[0]?.id ?? null, [graph]);
   const [activeEventId, setActiveEventId] = useState(firstEventId);
+
+  // Navigation index: mirrors exactly what the UI shows (display numbers = 1-based global position).
+  const navData = useMemo(() => {
+    const phases = graph.phasesInOrder();
+    const events = graph.eventsInOrder(); // sorted by local_order
+
+    // Group events by phase_key (same logic as StepsPanel).
+    const byPhaseKey = new Map();
+    events.forEach((e) => {
+      const k = e.props.phase_key;
+      if (!byPhaseKey.has(k)) byPhaseKey.set(k, []);
+      byPhaseKey.get(k).push(e);
+    });
+
+    // Visible phases only (skip phases with no observed steps).
+    const visiblePhases = phases.filter((p) => (byPhaseKey.get(p.props.phase_key) || []).length > 0);
+
+    // O(1) lookup: display number → event  (display num = local_order + 1, same as idx+1 in StepsPanel)
+    const eventByNum = new Map(events.map((e, i) => [i + 1, e]));
+
+    // O(1) lookup: visible phase number → first event in that phase
+    const firstEventByPhaseNum = new Map(
+      visiblePhases.map((p, i) => [i + 1, (byPhaseKey.get(p.props.phase_key) || [])[0]])
+    );
+
+    // Directory string passed to the LLM — uses the same numbers the user sees.
+    const lines = [];
+    visiblePhases.forEach((p, i) => {
+      lines.push(`Phase ${i + 1} — "${p.label}":`);
+      (byPhaseKey.get(p.props.phase_key) || []).forEach((e, j) => {
+        const displayNum = String(e.props.local_order + 1).padStart(2, "0");
+        lines.push(`  step ${displayNum}: "${e.label}"  (${e.props.time_s.toFixed(1)}s)`);
+      });
+    });
+
+    return { stepDirectory: lines.join("\n"), eventByNum, firstEventByPhaseNum };
+  }, [graph]);
   useEffect(() => {
     // when clip switches, snap to first event
     setActiveEventId(graph.eventsInOrder()[0]?.id ?? null);
@@ -54,8 +91,10 @@ function App() {
   const [llmKey, setLlmKey] = useState("");
   const [voiceKey, setVoiceKey] = useState("");
   const [llmEndpoint, setLlmEndpoint] = useState("");
+  const [convAgentId, setConvAgentId] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [aiOn, setAiOn] = useState(true);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
 
   const llm = window.Providers.LLM.find(llmId);
   const voice = window.Providers.TTS.find(voiceId);
@@ -74,6 +113,44 @@ function App() {
   function nowTime() {
     const d = new Date();
     return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+
+  // ---------- Conversational agent tools (callable by ElevenLabs agent) ----------
+  const convTools = {
+    navigate_to_step({ step_number }) {
+      const num    = parseInt(step_number, 10);
+      const target = navData.eventByNum.get(num);
+      if (!target) return `Step ${num} not found`;
+      setActiveEventId(target.id);
+      return `Navigated to step ${num}: ${target.label}`;
+    },
+    navigate_to_phase({ phase_number }) {
+      const num    = parseInt(phase_number, 10);
+      const target = navData.firstEventByPhaseNum.get(num);
+      if (!target) return `Phase ${num} not found`;
+      setActiveEventId(target.id);
+      return `Navigated to phase ${num}`;
+    },
+  };
+
+  // Push conv-agent transcript and replies into the shared chat history.
+  function onConvTranscript(text) {
+    setMessages((m) => [...m, { role: "user", text, time: nowTime(), source: "voice" }]);
+  }
+  function onConvAgentText(text, { hasAudio } = {}) {
+    setMessages((m) => [...m, { role: "ai", text, time: nowTime(), source: "voice" }]);
+    // If ElevenLabs sent text only (no TTS audio from their end), fall back to
+    // the app's configured TTS provider so the user still hears a voice response.
+    if (ttsEnabled && !hasAudio) {
+      const ctrl = new AbortController();
+      ttsAbortRef.current = ctrl;
+      window.Providers.TTS.speak({
+        providerId: voiceId,
+        text: stripMeta(text),
+        key: voiceKey,
+        signal: ctrl.signal,
+      }).catch(() => {});
+    }
   }
 
   async function handleSend(text) {
@@ -97,6 +174,7 @@ function App() {
         activeStepLine: activeLine,
         subgraphText: serialized.text,
         question: text,
+        stepDirectory: navData.stepDirectory,
       });
 
       // LLM
@@ -107,6 +185,20 @@ function App() {
         key: llmKey,
         endpoint: llmEndpoint || llm?.endpoint,
       });
+
+      // Parse and execute navigation action emitted by the LLM.
+      // Uses display numbers (1-based global position) matching what the user sees in the UI.
+      const navMatch = answer.match(/\[NAV:(step|phase):([^\]]+)\]/);
+      if (navMatch) {
+        const [, type, value] = navMatch;
+        const num = parseInt(value, 10);
+        if (!isNaN(num)) {
+          const target =
+            type === "step"  ? navData.eventByNum.get(num) :
+            type === "phase" ? navData.firstEventByPhaseNum.get(num) : null;
+          if (target) setActiveEventId(target.id);
+        }
+      }
 
       // Parse cited short ids from the answer text and elevate them.
       const cited = new Set();
@@ -121,7 +213,7 @@ function App() {
 
       const aiMsg = {
         role: "ai",
-        text: answer,
+        text: stripMeta(answer),
         time: nowTime(),
         refs: refsUsed.length ? refsUsed : serialized.refs.slice(0, 8),
         subgraph,
@@ -130,14 +222,16 @@ function App() {
       setMessages((m) => [...m, aiMsg]);
 
       // Voice
-      const ctrl = new AbortController();
-      ttsAbortRef.current = ctrl;
-      window.Providers.TTS.speak({
-        providerId: voiceId,
-        text: stripCitations(answer),
-        key: voiceKey,
-        signal: ctrl.signal,
-      });
+      if (ttsEnabled) {
+        const ctrl = new AbortController();
+        ttsAbortRef.current = ctrl;
+        window.Providers.TTS.speak({
+          providerId: voiceId,
+          text: stripMeta(answer),
+          key: voiceKey,
+          signal: ctrl.signal,
+        });
+      }
     } catch (e) {
       console.error(e);
       setMessages((m) => [...m, { role: "ai", text: "[error: " + (e?.message || e) + "]", time: nowTime() }]);
@@ -146,8 +240,8 @@ function App() {
     }
   }
 
-  function stripCitations(s) {
-    return s.replace(/\[[a-z]\d+\]/g, "").replace(/\s{2,}/g, " ").trim();
+  function stripMeta(s) {
+    return s.replace(/\[NAV:[^\]]+\]/g, "").replace(/\[[a-z]\d+\]/g, "").replace(/\s{2,}/g, " ").trim();
   }
 
   // ---------- Push-to-talk ----------
@@ -185,6 +279,10 @@ function App() {
         clipId={clipId}
         onOpenProviders={() => setDrawerOpen(true)}
         aiOn={aiOn} onAiToggle={() => setAiOn(!aiOn)}
+        ttsEnabled={ttsEnabled} onTtsToggle={() => {
+          if (ttsEnabled && ttsAbortRef.current) ttsAbortRef.current.abort();
+          setTtsEnabled((v) => !v);
+        }}
         llmLabel={shortenLabel(llmLabel)}
         voiceLabel={shortenLabel(voiceLabel)}
       />
@@ -230,6 +328,7 @@ function App() {
           llmKey={llmKey} onLlmKey={setLlmKey}
           voiceKey={voiceKey} onVoiceKey={setVoiceKey}
           llmEndpoint={llmEndpoint} onLlmEndpoint={setLlmEndpoint}
+          convAgentId={convAgentId} onConvAgentId={setConvAgentId}
         />
       )}
 
@@ -242,7 +341,19 @@ function App() {
         llmKey={llmKey} onLlmKey={setLlmKey}
         voiceKey={voiceKey} onVoiceKey={setVoiceKey}
         llmEndpoint={llmEndpoint} onLlmEndpoint={setLlmEndpoint}
+        convAgentId={convAgentId} onConvAgentId={setConvAgentId}
       />
+
+      {convAgentId.trim() && (
+        <ConvAgentButton
+          agentId={convAgentId.trim()}
+          apiKey={voiceKey}
+          tools={convTools}
+          dynamicVars={{ step_directory: navData.stepDirectory, clip_id: clipId }}
+          onTranscript={onConvTranscript}
+          onAgentText={onConvAgentText}
+        />
+      )}
 
       <GraphOverlay subgraph={overlay} onClose={() => setOverlay(null)} />
       <SetupBanner onOpen={() => setDrawerOpen(true)} />
@@ -258,7 +369,8 @@ function shortenLabel(s) {
 // Banner shown when no real LLM is wired up (i.e. outside Claude Design).
 function SetupBanner({ onOpen }) {
   const hasBuiltin = typeof window.claude?.complete === "function";
-  if (hasBuiltin) return null;
+  const [dismissed, setDismissed] = React.useState(false);
+  if (hasBuiltin || dismissed) return null;
   return (
     <div style={{
       position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
@@ -283,6 +395,25 @@ function SetupBanner({ onOpen }) {
           Open AI Configuration →
         </span>
       </span>
+      <button
+        onClick={() => setDismissed(true)}
+        style={{
+          marginLeft: "auto",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: "var(--fg-3)",
+          fontSize: 16,
+          lineHeight: 1,
+          padding: "2px 4px",
+          borderRadius: 4,
+          display: "flex",
+          alignItems: "center",
+        }}
+        title="Dismiss"
+      >
+        ✕
+      </button>
     </div>
   );
 }
@@ -295,6 +426,7 @@ function ConfigPage(props) {
     graph, clipId, clips, onSwitchClip,
     llmId, onLlm, voiceId, onVoice, voiceMode, onVoiceMode,
     llmKey, onLlmKey, voiceKey, onVoiceKey, llmEndpoint, onLlmEndpoint,
+    convAgentId, onConvAgentId,
   } = props;
   const llms = window.Providers.LLM.list();
   const voices = window.Providers.TTS.list();
@@ -360,6 +492,11 @@ function ConfigPage(props) {
           </div>
         </ConfigCard>
 
+        <ConvAgentConfigCard
+          convAgentId={convAgentId} onConvAgentId={onConvAgentId}
+          voiceKey={voiceKey}
+        />
+
         <ConfigCard title="Graph retrieval" subtitle="What the agent is grounded in.">
           <div className="field">
             <div className="label">Active clip</div>
@@ -409,6 +546,76 @@ an answer, say so plainly and propose the closest grounded node.
         </ConfigCard>
       </div>
     </main>
+  );
+}
+
+function ConvAgentConfigCard({ convAgentId, onConvAgentId, voiceKey }) {
+  const [configState, setConfigState] = useState("idle"); // idle | working | ok | err
+  const [configMsg,   setConfigMsg]   = useState("");
+
+  async function handleConfigure() {
+    if (!convAgentId.trim()) { setConfigMsg("Enter an Agent ID first."); setConfigState("err"); return; }
+    if (!voiceKey.trim())    { setConfigMsg("Enter your ElevenLabs API key in the Voice provider section first."); setConfigState("err"); return; }
+    setConfigState("working");
+    setConfigMsg("");
+    try {
+      const result = await window.ConvAgent.configureAgent(convAgentId.trim(), voiceKey.trim());
+      if (result.alreadyConfigured) {
+        setConfigMsg("Agent is already fully configured — nothing to change.");
+      } else {
+        const parts = [];
+        if (result.toolsAdded?.length) parts.push(`Added tools: ${result.toolsAdded.join(", ")}`);
+        if (result.promptUpdated)      parts.push("Injected {{step_directory}} into system prompt");
+        setConfigMsg(parts.join(" · "));
+      }
+      setConfigState("ok");
+    } catch (e) {
+      setConfigMsg(e.message);
+      setConfigState("err");
+    }
+  }
+
+  const canConfigure = convAgentId.trim() && voiceKey.trim();
+
+  return (
+    <ConfigCard title="Conversational Agent" subtitle="ElevenLabs real-time voice agent with tool calls.">
+      <p className="p-sm fg-3" style={{ margin: "0 0 12px" }}>
+        Enter your ElevenLabs Agent ID, then click <strong>Auto-configure</strong> to automatically add the
+        navigation tools and step-directory variable to your agent — no dashboard editing needed.
+        Uses the same API key as the Voice provider above.
+      </p>
+      <div className="field">
+        <div className="label">Agent ID</div>
+        <input
+          value={convAgentId}
+          onChange={(e) => { onConvAgentId(e.target.value); setConfigState("idle"); setConfigMsg(""); }}
+          placeholder="agt_•••"
+        />
+      </div>
+      <div className="flex gap-2" style={{ marginTop: 12, alignItems: "center" }}>
+        <button
+          className={"btn" + (configState === "ok" ? " primary" : "")}
+          onClick={handleConfigure}
+          disabled={!canConfigure || configState === "working"}
+        >
+          {configState === "working" ? "Configuring…" : configState === "ok" ? "✓ Configured" : "Auto-configure agent"}
+        </button>
+        {configMsg && (
+          <span style={{
+            fontSize: "var(--text-xs)", fontFamily: "var(--font-mono)",
+            color: configState === "err" ? "var(--fail)" : "var(--ok)",
+            flex: 1,
+          }}>
+            {configMsg}
+          </span>
+        )}
+      </div>
+      {!canConfigure && (
+        <p className="p-sm fg-3" style={{ margin: "8px 0 0" }}>
+          {!voiceKey.trim() ? "Set your ElevenLabs API key above first." : "Enter an Agent ID to enable auto-configure."}
+        </p>
+      )}
+    </ConfigCard>
   );
 }
 

@@ -424,6 +424,107 @@
   50%      { box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); }
 }
 
+/* ---------- Conversational agent button ---------- */
+.conv-agent-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px 7px 7px;
+  background: var(--bg-3);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--r-full);
+  box-shadow: var(--shadow-float);
+  cursor: pointer;
+  color: var(--fg-1);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  transition: box-shadow 0.2s, border-color 0.2s;
+  user-select: none;
+  white-space: nowrap;
+}
+.conv-agent-btn:hover  { box-shadow: 0 0 0 1px var(--accent-400), var(--shadow-float); }
+.conv-agent-btn.active { border-color: var(--accent-400); }
+.conv-agent-btn.err    { border-color: var(--fail); }
+.conv-agent-btn .x-icon { opacity: 0.45; flex-shrink: 0; }
+
+/* Gradient orb */
+.conv-orb {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-full);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(circle at 35% 30%, #7dd3fc, #3b82f6 42%, #1d4ed8 72%, #0c1a3a);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.35);
+}
+/* Specular highlight */
+.conv-orb::before {
+  content: '';
+  position: absolute;
+  top: 17%; left: 20%;
+  width: 32%; height: 22%;
+  background: rgba(255, 255, 255, 0.48);
+  border-radius: var(--r-full);
+  filter: blur(3px);
+  pointer-events: none;
+}
+
+/* — Idle: gentle breath */
+@keyframes orb-idle {
+  0%, 100% { transform: scale(1);    opacity: 1; }
+  50%       { transform: scale(1.05); opacity: 0.88; }
+}
+/* — Connecting: faster pulse + glow */
+@keyframes orb-connecting {
+  0%, 100% { transform: scale(1);    box-shadow: 0 0 10px rgba(59,130,246,0.35); }
+  50%       { transform: scale(1.12); box-shadow: 0 0 24px rgba(59,130,246,0.75); }
+}
+/* — Listening: outward ripple rings */
+@keyframes orb-listen {
+  0%   { box-shadow: 0 0 0 0   rgba(52,211,153,0.7), 0 0 0 0   rgba(52,211,153,0.35); }
+  70%  { box-shadow: 0 0 0 16px rgba(52,211,153,0),   0 0 0 9px  rgba(52,211,153,0.08); }
+  100% { box-shadow: 0 0 0 16px rgba(52,211,153,0),   0 0 0 9px  rgba(52,211,153,0); }
+}
+/* — Speaking: scale bounce + hue shift */
+@keyframes orb-speak {
+  0%, 100% { transform: scale(1);    filter: hue-rotate(0deg)  brightness(1); }
+  30%       { transform: scale(1.14); filter: hue-rotate(28deg) brightness(1.3); }
+  65%       { transform: scale(0.93); filter: hue-rotate(-12deg) brightness(0.88); }
+}
+
+/* — Thinking: slow amber orbit spin */
+@keyframes orb-think {
+  0%, 100% { transform: scale(1);    filter: hue-rotate(0deg); }
+  50%       { transform: scale(1.07); filter: hue-rotate(40deg) brightness(1.2); }
+}
+
+.conv-orb.idle       { animation: orb-idle       2.6s ease-in-out infinite; }
+.conv-orb.connecting { animation: orb-connecting  0.85s ease-in-out infinite; }
+.conv-orb.listening  {
+  animation: orb-listen 1.35s ease-out infinite;
+  background: radial-gradient(circle at 35% 30%, #6ee7b7, #10b981 42%, #065f46 72%, #0a2010);
+  box-shadow: 0 0 10px rgba(16,185,129,0.4);
+}
+.conv-orb.thinking   {
+  animation: orb-think 1.1s ease-in-out infinite;
+  background: radial-gradient(circle at 35% 30%, #fde68a, #f59e0b 42%, #92400e 72%, #1a0e00);
+  box-shadow: 0 0 12px rgba(245,158,11,0.45);
+}
+.conv-orb.speaking   {
+  animation: orb-speak 0.6s ease-in-out infinite;
+  background: radial-gradient(circle at 35% 30%, #a5f3fc, #06b6d4 42%, #0e7490 72%, #071a20);
+  box-shadow: 0 0 14px rgba(6,182,212,0.55);
+}
+.conv-orb.error      {
+  background: radial-gradient(circle at 35% 30%, #fca5a5, #ef4444 42%, #991b1b 72%, #200808);
+  box-shadow: 0 0 12px rgba(239,68,68,0.45);
+}
+
 /* ---------- Graph overlay ---------- */
 .graph-overlay {
   position: fixed; inset: 0;

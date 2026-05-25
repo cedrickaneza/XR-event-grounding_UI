@@ -4,7 +4,20 @@
 // answer isn't in the subgraph.
 
 (function () {
-  function build({ clipId, activeStepLine, subgraphText, question }) {
+  function build({ clipId, activeStepLine, subgraphText, question, stepDirectory }) {
+    const navBlock = stepDirectory ? [
+      ``,
+      `## NAVIGATION ACTIONS`,
+      `When the user asks to go to, jump to, show, or navigate to a step or phase,`,
+      `include exactly one navigation tag anywhere in your response:`,
+      `  [NAV:step:<number>]    — jump to a specific step (use the step number shown in the directory below, e.g. [NAV:step:3])`,
+      `  [NAV:phase:<number>]   — jump to the first step of a phase (use the phase number shown below, e.g. [NAV:phase:2])`,
+      `Only emit a NAV tag when the user explicitly requests navigation. Never emit it for informational answers.`,
+      ``,
+      `## STEP DIRECTORY (all steps in this clip)`,
+      stepDirectory,
+    ] : [];
+
     return [
       `You are the Grounding Agent for IndustReal clip ${clipId}.`,
       `Answer ONLY from the assembly subgraph below. Each fact must cite at`,
@@ -17,6 +30,7 @@
       ``,
       `## SUBGRAPH (retrieved from Neo4j)`,
       subgraphText,
+      ...navBlock,
       ``,
       `## USER QUESTION`,
       question,
