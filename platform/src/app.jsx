@@ -20,7 +20,7 @@
 const { useEffect, useMemo, useRef, useState } = React;
 const {
   Topbar, StepsPanel, VideoPanel, ChatPanel, ProviderDrawer,
-  ConvAgentButton, GraphViz, GraphOverlay,
+  ConvAgentButton, GraphViz, GraphOverlay, LiveGraphView,
 } = window;
 
 function App() {
@@ -75,6 +75,8 @@ function App() {
 
   const [progress, setProgress] = useState(0);
   const [playing, setPlaying] = useState(false);
+  // Shared across Instruction + Live Graph tabs so loading a clip once works everywhere.
+  const [videoUrl, setVideoUrl] = useState(null);
 
   // Sync progress when the active event changes via keyboard / list click.
   useEffect(() => {
@@ -302,6 +304,8 @@ function App() {
             playing={playing}
             onTogglePlay={() => setPlaying((p) => !p)}
             onJumpEvent={setActiveEventId}
+            videoUrl={videoUrl}
+            onVideoUrl={setVideoUrl}
           />
           <ChatPanel
             aiOn={aiOn}
@@ -318,6 +322,18 @@ function App() {
             clipId={clipId}
           />
         </main>
+      ) : tab === "livegraph" ? (
+        <LiveGraphView
+          graph={graph}
+          activeEventId={activeEventId}
+          progress={progress}
+          onScrub={setProgress}
+          playing={playing}
+          onTogglePlay={() => setPlaying((p) => !p)}
+          onJumpEvent={setActiveEventId}
+          videoUrl={videoUrl}
+          onVideoUrl={setVideoUrl}
+        />
       ) : (
         <ConfigPage
           graph={graph}

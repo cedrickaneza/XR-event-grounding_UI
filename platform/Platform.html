@@ -7,6 +7,7 @@
 
   <link rel="stylesheet" href="src/lattice-tokens.css" />
   <link rel="stylesheet" href="src/styles.css" />
+  <link rel="stylesheet" href="src/live-graph.css" />
 </head>
 <body>
   <div id="root" class="app"></div>
@@ -27,8 +28,23 @@
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 
   <!-- UI -->
+  <script type="text/babel" src="src/tweaks-panel.jsx"></script>
   <script type="text/babel" src="src/components.jsx"></script>
   <script type="text/babel" src="src/graph-viz.jsx"></script>
+  <script type="text/babel" src="src/live-graph.jsx"></script>
   <script type="text/babel" src="src/app.jsx"></script>
+
+  <!-- Tweakable defaults — host writes back here on __edit_mode_set_keys -->
+  <script>
+    window.LG_TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+      "stagger_s": 0.2,
+      "show_dots": true,
+      "show_phase_bands": true,
+      "show_playhead": true,
+      "show_edge_labels": true,
+      "active_glow": "breathing",
+      "palette": "warm"
+    }/*EDITMODE-END*/;
+  </script>
 </body>
 </html>

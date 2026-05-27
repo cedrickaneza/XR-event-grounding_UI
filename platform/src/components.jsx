@@ -40,6 +40,8 @@ function Topbar({ tab, onTab, clipId, onOpenProviders, aiOn, onAiToggle, ttsEnab
       <div className="tabs">
         <div className={"tab" + (tab === "instruction" ? " active" : "")}
              onClick={() => onTab("instruction")}>Instruction</div>
+        <div className={"tab" + (tab === "livegraph" ? " active" : "")}
+             onClick={() => onTab("livegraph")}>Live Graph</div>
         <div className={"tab" + (tab === "config" ? " active" : "")}
              onClick={() => onTab("config")}>AI Configuration</div>
       </div>
@@ -142,13 +144,17 @@ function StepsPanel({ graph, activeEventId, onPickStep }) {
 // ---------------------------------------------------------------------------
 // Video panel
 // ---------------------------------------------------------------------------
-function VideoPanel({ graph, activeEventId, progress, onScrub, playing, onTogglePlay, onJumpEvent }) {
+function VideoPanel({ graph, activeEventId, progress, onScrub, playing, onTogglePlay, onJumpEvent, videoUrl: extVideoUrl, onVideoUrl }) {
   const events = graph.eventsInOrder();
   const active = graph.get(activeEventId);
   const clip = graph.clip;
   const fileRef = useRef(null);
   const videoRef = useRef(null);
-  const [videoUrl, setVideoUrl] = useState(null);
+  // Accept videoUrl from props if provided (so the Live Graph tab can share the same clip);
+  // otherwise fall back to local state for backwards compat.
+  const [localVideoUrl, setLocalVideoUrl] = useState(null);
+  const videoUrl = extVideoUrl !== undefined ? extVideoUrl : localVideoUrl;
+  const setVideoUrl = onVideoUrl || setLocalVideoUrl;
 
   // Keep <video> in sync with our shared progress state.
   useEffect(() => {
