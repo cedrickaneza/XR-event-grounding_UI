@@ -25,7 +25,28 @@ const {
 
 function App() {
   // ---------- Top-level state ----------
-  const [tab, setTab] = useState("instruction");
+  // Tab is hash-routable so the Intro deck can deep-link directly into a tab
+  // (Platform.html#livegraph, Platform.html#instruction, Platform.html#config).
+  // The hash is the source of truth on load; thereafter tab clicks update it.
+  const VALID_TABS = { instruction: 1, livegraph: 1, config: 1 };
+  const tabFromHash = () => {
+    const h = (window.location.hash || "").replace(/^#/, "").toLowerCase();
+    return VALID_TABS[h] ? h : "instruction";
+  };
+  const [tab, _setTab] = useState(tabFromHash);
+  const setTab = (next) => {
+    _setTab(next);
+    // Keep the URL in sync without scrolling — useful if the user wants to
+    // share a link to a specific tab, or refresh and stay put.
+    if (window.location.hash.replace(/^#/, "") !== next) {
+      history.replaceState(null, "", "#" + next);
+    }
+  };
+  useEffect(() => {
+    const onHash = () => _setTab(tabFromHash());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
   const [clipId, setClipId] = useState(window.INDUSTREAL_DATA.default_clip);
   const graph = useMemo(() => window.GraphStore.build(clipId), [clipId]);
 
@@ -97,6 +118,10 @@ function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [aiOn, setAiOn] = useState(true);
   const [ttsEnabled, setTtsEnabled] = useState(true);
+  // Agent widget visibility — controlled by the top-right toggle. Hidden by
+  // default so the floating button doesn't sit on top of other UI until the
+  // operator explicitly opens it.
+  const [agentVisible, setAgentVisible] = useState(false);
 
   const llm = window.Providers.LLM.find(llmId);
   const voice = window.Providers.TTS.find(voiceId);
@@ -281,9 +306,14 @@ function App() {
         clipId={clipId}
         onOpenProviders={() => setDrawerOpen(true)}
         aiOn={aiOn} onAiToggle={() => setAiOn(!aiOn)}
-        ttsEnabled={ttsEnabled} onTtsToggle={() => {
-          if (ttsEnabled && ttsAbortRef.current) ttsAbortRef.current.abort();
-          setTtsEnabled((v) => !v);
+        agentVisible={agentVisible}
+        onAgentToggle={() => {
+          // Closing the widget while a call is active also disconnects so we
+          // don't leave a hidden mic streaming in the background.
+          if (agentVisible && window.ConvAgent) {
+            try { window.ConvAgent.stop(); } catch {}
+          }
+          setAgentVisible((v) => !v);
         }}
         llmLabel={shortenLabel(llmLabel)}
         voiceLabel={shortenLabel(voiceLabel)}
@@ -360,7 +390,7 @@ function App() {
         convAgentId={convAgentId} onConvAgentId={setConvAgentId}
       />
 
-      {convAgentId.trim() && (
+      {convAgentId.trim() && agentVisible && (
         <ConvAgentButton
           agentId={convAgentId.trim()}
           apiKey={voiceKey}

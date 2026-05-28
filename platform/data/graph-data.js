@@ -714,5 +714,5 @@ window.INDUSTREAL_DATA = {
       "normalized": "short_rear_chassis"
     }
   ],
-  "default_clip": "03_assy_0_1"
+  "default_clip": "10_assy_0_1"
 };

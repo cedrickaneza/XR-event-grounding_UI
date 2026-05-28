@@ -30,13 +30,13 @@ function Icon({ name, size = 16 }) {
 // ---------------------------------------------------------------------------
 // Topbar
 // ---------------------------------------------------------------------------
-function Topbar({ tab, onTab, clipId, onOpenProviders, aiOn, onAiToggle, ttsEnabled, onTtsToggle, llmLabel, voiceLabel }) {
+function Topbar({ tab, onTab, clipId, onOpenProviders, aiOn, onAiToggle, agentVisible, onAgentToggle, llmLabel, voiceLabel }) {
   return (
     <header className="topbar">
-      <div className="wm">
+      <a className="wm" href="Intro.html" title="Back to the intro deck">
         <div className="wm-mark" />
         <h4>XR Event Grounding</h4>
-      </div>
+      </a>
       <div className="tabs">
         <div className={"tab" + (tab === "instruction" ? " active" : "")}
              onClick={() => onTab("instruction")}>Instruction</div>
@@ -55,8 +55,12 @@ function Topbar({ tab, onTab, clipId, onOpenProviders, aiOn, onAiToggle, ttsEnab
           voice · {voiceLabel}
         </span>
         <div className="pair">
-          <span className="mono-caps">Voice</span>
-          <div className={"toggle" + (ttsEnabled ? " on" : "")} onClick={onTtsToggle} title={ttsEnabled ? "Mute AI voice" : "Unmute AI voice"}>
+          <span className="mono-caps">Agent</span>
+          <div
+            className={"toggle" + (agentVisible ? " on" : "")}
+            onClick={onAgentToggle}
+            title={agentVisible ? "Hide the voice-agent widget" : "Show the voice-agent widget"}
+          >
             <div className="dot" />
           </div>
         </div>
@@ -479,14 +483,42 @@ function truncate(s, n) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
 // ---------------------------------------------------------------------------
 // Conversational agent floating button
 // ---------------------------------------------------------------------------
+//
+// Drag-to-move: the operator may want to pull this off the bottom-right if it
+// covers chat content / the PiP video. Position persists across reloads.
+// A click only fires when the pointer barely moved between mousedown and
+// mouseup (DRAG_THRESHOLD_PX) — so a slow drag never accidentally toggles the
+// agent on/off.
+const CONV_POS_KEY = 'convAgent.pos.v1';
+const DRAG_THRESHOLD_PX = 5;
+
+function readConvPos() {
+  try {
+    const raw = localStorage.getItem(CONV_POS_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (typeof p?.right === 'number' && typeof p?.bottom === 'number') return p;
+  } catch {}
+  return null;
+}
+
 function ConvAgentButton({ agentId, apiKey, tools, dynamicVars, onTranscript, onAgentText }) {
   const [status, setStatus] = React.useState('idle');
   const [mode,   setMode]   = React.useState(null);
   const [errMsg, setErrMsg] = React.useState('');
+  const [pos, setPos]       = React.useState(() => readConvPos() || { right: 24, bottom: 24 });
+  const [dragging, setDragging] = React.useState(false);
+  const moveDistRef = React.useRef(0);
 
   const isActive = status === 'connected' || status === 'connecting';
 
   async function handleClick() {
+    // Suppress click immediately after a drag — otherwise releasing the mouse
+    // anywhere on the button would toggle the agent connection on/off.
+    if (moveDistRef.current >= DRAG_THRESHOLD_PX) {
+      moveDistRef.current = 0;
+      return;
+    }
     if (isActive || status === 'error') {
       window.ConvAgent.stop();
       setStatus('idle');
@@ -521,11 +553,63 @@ function ConvAgentButton({ agentId, apiKey, tools, dynamicVars, onTranscript, on
     mode   === 'listening'  ? 'Listening…'           :
     isActive                ? 'Connected'            : 'Talk to an agent';
 
+  // ----- Drag handling -----------------------------------------------------
+  // We anchor by right/bottom so the button stays put when the viewport is
+  // resized (same convention as the original fixed CSS).
+  function onMouseDown(e) {
+    if (e.button !== 0) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startPos = { ...pos };
+    moveDistRef.current = 0;
+
+    function onMove(ev) {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      const dist = Math.hypot(dx, dy);
+      if (dist < DRAG_THRESHOLD_PX) return;
+      moveDistRef.current = dist;
+      setDragging(true);
+      // Translate cursor delta into right/bottom anchors and clamp inside
+      // the viewport with a 4px margin so the button can't be hidden offscreen.
+      const next = {
+        right:  Math.max(4, Math.min(window.innerWidth  - 60, startPos.right  - dx)),
+        bottom: Math.max(4, Math.min(window.innerHeight - 40, startPos.bottom - dy)),
+      };
+      setPos(next);
+    }
+    function onUp() {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.userSelect = '';
+      if (moveDistRef.current >= DRAG_THRESHOLD_PX) {
+        try { localStorage.setItem(CONV_POS_KEY, JSON.stringify(pos)); } catch {}
+        // Snapshot for persistence happens once; the click handler reads the
+        // ref to decide whether to bail out.
+        setTimeout(() => { setDragging(false); }, 0);
+      } else {
+        setDragging(false);
+      }
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    document.body.style.userSelect = 'none';
+  }
+
+  // Whenever the persisted position state changes (after a drag settles),
+  // mirror it to localStorage. Cheap; keeps storage and state in sync even
+  // if onMove writes mid-drag.
+  React.useEffect(() => {
+    try { localStorage.setItem(CONV_POS_KEY, JSON.stringify(pos)); } catch {}
+  }, [pos]);
+
   return (
     <button
-      className={'conv-agent-btn' + (isActive ? ' active' : '') + (status === 'error' ? ' err' : '')}
+      className={'conv-agent-btn' + (isActive ? ' active' : '') + (status === 'error' ? ' err' : '') + (dragging ? ' dragging' : '')}
+      style={{ right: pos.right, bottom: pos.bottom, cursor: dragging ? 'grabbing' : 'grab' }}
+      onMouseDown={onMouseDown}
       onClick={handleClick}
-      title={errMsg || label}
+      title={errMsg || (label + ' — drag to move')}
     >
       <div className={'conv-orb ' + orbState} />
       <span>{label}</span>

@@ -1,0 +1,1132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IndustReal — Intro</title>
+
+  <link rel="stylesheet" href="src/lattice-tokens.css" />
+
+  <!-- Tweakable defaults — host writes back here on __edit_mode_set_keys.
+       The block must stay in this exact shape so direct-edit / save works. -->
+  <script>
+    window.INTRO_TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+      "theme": "midnight",
+      "accent": "sky",
+      "headline_weight": 500,
+      "bg_pattern": "plain",
+      "card_style": "bordered",
+      "show_step_pips": true,
+      "show_slide_numbers": true,
+      "embed_shadow": "soft",
+      "hero_treatment": "clean"
+    }/*EDITMODE-END*/;
+  </script>
+
+  <style>
+    /* ------------------------------------------------------------------
+       Theme variants — each body class overrides the relevant
+       lattice-tokens custom properties. Pick one at a time.
+       ------------------------------------------------------------------ */
+    body.theme-midnight {
+      /* Same palette the page ships with — left here for explicitness. */
+    }
+    body.theme-charcoal {
+      --bg-0: #1a1816;
+      --bg-1: #232120;
+      --bg-2: #2c2a28;
+      --bg-3: #353331;
+      --bg-4: #3e3b39;
+      --border-1: #383532;
+      --border-2: #46423f;
+      --border-3: #5a5552;
+    }
+    body.theme-ink {
+      --bg-0: #0a0a0a;
+      --bg-1: #141414;
+      --bg-2: #1e1e1e;
+      --bg-3: #282828;
+      --bg-4: #323232;
+      --border-1: #2a2a2a;
+      --border-2: #3a3a3a;
+      --border-3: #4a4a4a;
+    }
+
+    /* ------------------------------------------------------------------
+       Accent variants — swap the sky-blue family for amber or emerald.
+       Touches the overline, headline-weight isn't affected here.
+       ------------------------------------------------------------------ */
+    body.accent-amber {
+      --accent-300: #fcd34d;
+      --accent-400: #fbbf24;
+      --accent-500: #f59e0b;
+      --accent-600: #d97706;
+      --accent-700: #b45309;
+      --border-accent: rgba(245, 158, 11, 0.55);
+    }
+    body.accent-emerald {
+      --accent-300: #6ee7b7;
+      --accent-400: #34d399;
+      --accent-500: #10b981;
+      --accent-600: #059669;
+      --accent-700: #047857;
+      --border-accent: rgba(16, 185, 129, 0.55);
+    }
+
+    /* ------------------------------------------------------------------
+       Background patterns — layered into deck-stage section so they
+       sit behind every slide's chrome.
+       ------------------------------------------------------------------ */
+    body.pattern-dotted deck-stage section {
+      background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1.4px);
+      background-size: 28px 28px;
+    }
+    body.pattern-grid deck-stage section {
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+      background-size: 80px 80px;
+    }
+
+    /* ------------------------------------------------------------------
+       Headline weight — set via inline style on each h*.headline. */
+    /* (No CSS rule needed; applied via JS for specificity.) */
+
+    /* ------------------------------------------------------------------
+       Slide-2 anatomy card variants. */
+    body.card-filled .anatomy-card {
+      background: var(--bg-2);
+      border: 1px solid var(--bg-3);
+      border-top: 2px solid var(--accent-500);
+    }
+    body.card-outline .anatomy-card {
+      background: transparent;
+      border: 1px solid var(--border-2);
+      border-top: 2px solid var(--accent-500);
+    }
+
+    /* ------------------------------------------------------------------
+       Embed frame shadow variants (slides 3 & 4 iframe wrapper). */
+    body.shadow-hard .embed-frame {
+      box-shadow:
+        0 4px 0 var(--accent-700),
+        0 4px 24px -4px rgba(0, 0, 0, 0.5);
+    }
+    body.shadow-none .embed-frame {
+      box-shadow: none;
+      border-color: var(--border-3);
+    }
+
+    /* ------------------------------------------------------------------
+       Hero image treatment (slides 1 & 2). */
+    body.hero-vignette .hero-img-wrap img,
+    body.hero-vignette .anatomy-img {
+      filter: drop-shadow(0 24px 48px rgba(0, 0, 0, 0.45)) brightness(0.95) contrast(1.05);
+      mask-image: radial-gradient(120% 80% at 50% 50%, #000 65%, transparent 100%);
+    }
+    body.hero-glow .hero-img-wrap img,
+    body.hero-glow .anatomy-img {
+      filter:
+        drop-shadow(0 24px 48px rgba(0, 0, 0, 0.45))
+        drop-shadow(0 0 36px rgba(14, 165, 233, 0.25));
+    }
+    body.accent-amber.hero-glow .hero-img-wrap img,
+    body.accent-amber.hero-glow .anatomy-img {
+      filter:
+        drop-shadow(0 24px 48px rgba(0, 0, 0, 0.45))
+        drop-shadow(0 0 36px rgba(245, 158, 11, 0.30));
+    }
+    body.accent-emerald.hero-glow .hero-img-wrap img,
+    body.accent-emerald.hero-glow .anatomy-img {
+      filter:
+        drop-shadow(0 24px 48px rgba(0, 0, 0, 0.45))
+        drop-shadow(0 0 36px rgba(16, 185, 129, 0.30));
+    }
+
+    /* ------------------------------------------------------------------
+       Toggles for the small slide-chrome bits. */
+    body.hide-step-pips .step-mark { visibility: hidden; }
+    body.hide-slide-numbers .slide-foot > div:last-child { visibility: hidden; }
+
+    /* ==================================================================
+       Tweaks panel UI — hidden by default, shown when the host activates
+       edit mode (via __activate_edit_mode postMessage). Hand-rolled so we
+       don't have to drag React into a static deck.
+       ================================================================== */
+    .intro-tweaks {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      width: 280px;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      background: rgba(15, 23, 42, 0.94);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-2);
+      border-radius: 12px;
+      padding: 14px 16px 18px;
+      font-family: var(--font-body);
+      color: var(--fg-1);
+      box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.7);
+      z-index: 9000;
+      display: none;
+    }
+    body.tweaks-open .intro-tweaks { display: block; }
+    .intro-tweaks h5 {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--fg-3);
+      margin: 0 0 10px;
+    }
+    .intro-tweaks .twk-section {
+      margin-bottom: 14px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border-1);
+    }
+    .intro-tweaks .twk-section:last-child { border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
+    .intro-tweaks .twk-label {
+      font-size: 11px;
+      color: var(--fg-3);
+      margin: 0 0 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .intro-tweaks .twk-row {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .intro-tweaks .twk-pill {
+      flex: 1 1 auto;
+      min-width: max-content;
+      padding: 6px 10px;
+      background: var(--bg-2);
+      border: 1px solid var(--border-1);
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: var(--font-body);
+      color: var(--fg-2);
+      cursor: pointer;
+      transition: background 120ms, color 120ms, border-color 120ms;
+      text-align: center;
+    }
+    .intro-tweaks .twk-pill:hover { background: var(--bg-3); color: var(--fg-1); }
+    .intro-tweaks .twk-pill.on {
+      background: var(--accent-500);
+      border-color: var(--accent-500);
+      color: #001220;
+      font-weight: 500;
+    }
+    .intro-tweaks .twk-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--fg-2);
+    }
+    .intro-tweaks .twk-switch {
+      width: 34px; height: 18px;
+      background: var(--bg-3);
+      border: 1px solid var(--border-2);
+      border-radius: 999px;
+      position: relative;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 120ms;
+    }
+    .intro-tweaks .twk-switch::after {
+      content: "";
+      position: absolute;
+      top: 1px; left: 1px;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--fg-1);
+      transition: transform 160ms ease-out;
+    }
+    .intro-tweaks .twk-toggle.on .twk-switch {
+      background: var(--accent-500);
+      border-color: var(--accent-500);
+    }
+    .intro-tweaks .twk-toggle.on .twk-switch::after { transform: translateX(16px); background: #001220; }
+
+    /* ------------------------------------------------------------------
+       Deck-level chrome. Slides themselves are positioned by <deck-stage>;
+       these rules only style the inside of each <section>.
+       ------------------------------------------------------------------ */
+    deck-stage:not(:defined) { visibility: hidden; }
+
+    html, body { background: var(--bg-0); color: var(--fg-1); margin: 0; }
+
+    deck-stage section {
+      background: var(--bg-0);
+      color: var(--fg-1);
+      font-family: var(--font-body);
+      overflow: hidden;
+    }
+
+    /* The slide canvas is 1920×1080; we lay each one out as a CSS grid so
+       the headline, body and footer sit in predictable bands without
+       hand-tuned absolute positions. */
+    .slide {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      padding: 96px 120px;
+      box-sizing: border-box;
+      gap: 48px;
+    }
+
+    /* ----- Top bar: overline + step indicator ----- */
+    .slide-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .overline {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--accent-500);
+    }
+    .step-mark {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .step-mark .pip {
+      width: 32px; height: 4px;
+      background: var(--border-2);
+      border-radius: 999px;
+      transition: background 0.25s;
+    }
+    .step-mark .pip.on { background: var(--accent-500); }
+
+    /* ----- Bottom bar: small footer line ----- */
+    .slide-foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--fg-3);
+    }
+    .slide-foot strong { color: var(--fg-2); font-weight: 500; }
+
+    /* ----- Typography ----- */
+    h1.headline {
+      font-family: var(--font-display);
+      font-size: 96px;
+      line-height: 1.02;
+      letter-spacing: -0.025em;
+      margin: 0;
+      font-weight: 500;
+      max-width: 18ch;
+      text-wrap: balance;
+    }
+    h2.headline {
+      font-family: var(--font-display);
+      font-size: 72px;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      margin: 0;
+      font-weight: 500;
+      max-width: 20ch;
+    }
+    p.lede {
+      font-family: var(--font-body);
+      font-size: 28px;
+      line-height: 1.45;
+      color: var(--fg-2);
+      max-width: 28ch;
+      margin: 0;
+      text-wrap: pretty;
+    }
+
+    /* ====================================================================
+       SLIDE 1 — Title hero
+       Top half = title block, bottom half = wide image of the assembly.
+       ==================================================================== */
+    .slide-title {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 56px;
+    }
+    .slide-title .title-band {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 96px;
+      align-items: end;
+    }
+    .slide-title .hero-img-wrap {
+      align-self: end;
+      width: 100%;
+      background:
+        radial-gradient(120% 80% at 50% 100%, rgba(14, 165, 233, 0.10), transparent 70%),
+        linear-gradient(180deg, transparent, var(--bg-1) 75%);
+      border-top: 1px solid var(--border-1);
+      padding: 32px 0 0;
+      display: flex;
+      justify-content: center;
+    }
+    .slide-title .hero-img-wrap img {
+      width: 100%;
+      max-width: 1640px;
+      height: auto;
+      object-fit: contain;
+      display: block;
+      filter: drop-shadow(0 24px 48px rgba(0, 0, 0, 0.45));
+    }
+
+    /* ====================================================================
+       SLIDE 2 — Anatomy of the dataset
+       Hero band on top, four labeled callout cards underneath.
+       ==================================================================== */
+    .slide-anatomy {
+      padding: 72px 120px;       /* shave 24px top+bottom to keep foot in-bounds */
+      gap: 32px;
+    }
+    .slide-anatomy .anatomy-inner {
+      display: grid;
+      grid-template-rows: auto auto auto;
+      gap: 36px;
+      min-height: 0;
+    }
+    .slide-anatomy .anatomy-img {
+      width: 100%;
+      height: 280px;
+      object-fit: contain;
+      display: block;
+    }
+    .anatomy-cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 28px;
+    }
+    .anatomy-card {
+      background: var(--bg-1);
+      border: 1px solid var(--border-1);
+      border-top: 2px solid var(--accent-500);
+      border-radius: 8px;
+      padding: 28px 28px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .anatomy-card .num {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent-300);
+    }
+    .anatomy-card h3 {
+      font-family: var(--font-display);
+      font-size: 32px;
+      margin: 0;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+    }
+    .anatomy-card p {
+      font-family: var(--font-body);
+      font-size: 18px;
+      line-height: 1.45;
+      color: var(--fg-2);
+      margin: 0;
+    }
+
+    /* ====================================================================
+       SLIDE 3 / 4 — Live embeds of the app
+       Thin header band at top, then a near-full-bleed iframe of the real
+       Platform.html deep-linked to the right tab. The iframe is rendered
+       inside a framed surface so it reads as "a screen within the slide."
+       ==================================================================== */
+    .slide-embed {
+      /* 4 rows: top bar, head-row, iframe (1fr — grows), footer. The original
+         3-row template (auto 1fr auto) left the iframe in an auto row that
+         collapsed to 0 while the head-row ate all the slack. */
+      grid-template-rows: auto auto 1fr auto;
+      gap: 16px;
+      padding: 28px 64px 32px;       /* compact: give the iframe as much room as possible */
+    }
+    .slide-embed .head-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 48px;
+      align-items: start;
+    }
+    .slide-embed .head-row h2.headline {
+      font-size: 32px;
+      line-height: 1.1;
+      max-width: 28ch;
+    }
+    .slide-embed .head-row .blurb {
+      font-size: 14px;
+      max-width: 44ch;
+    }
+    .slide-embed .slide-top { margin-bottom: -4px; }
+    .slide-embed .overline { font-size: 12px; letter-spacing: 0.24em; }
+    .slide-embed .slide-foot { font-size: 11px; }
+    .slide-embed .head-row h2.headline {
+      font-size: 56px;
+      max-width: 24ch;
+    }
+    .slide-embed .head-row .blurb {
+      font-family: var(--font-body);
+      font-size: 19px;
+      color: var(--fg-3);
+      max-width: 38ch;
+      text-align: right;
+      line-height: 1.45;
+      text-wrap: pretty;
+    }
+    .embed-frame {
+      position: relative;
+      background: var(--bg-0);
+      border: 1px solid var(--border-2);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow:
+        0 28px 64px -20px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+      min-height: 0;
+    }
+    .embed-frame iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: var(--bg-0);
+    }
+    /* Old transition layout kept for any future use — unused by current slides. */
+    .slide-transition {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 96px;
+      align-items: center;
+    }
+    .slide-transition .copy-col {
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+    }
+    .meta-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .meta-list li {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 18px;
+      align-items: baseline;
+      font-family: var(--font-body);
+      font-size: 21px;
+      color: var(--fg-2);
+      line-height: 1.4;
+    }
+    .meta-list code {
+      font-family: var(--font-mono);
+      font-size: 17px;
+      letter-spacing: 0.04em;
+      color: var(--accent-300);
+      background: rgba(14, 165, 233, 0.08);
+      padding: 3px 10px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    /* Big launch buttons — primary call-to-action visual */
+    .cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 16px;
+      align-self: flex-start;
+      padding: 22px 36px;
+      background: var(--accent-500);
+      color: #001220;
+      font-family: var(--font-display);
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.005em;
+      border-radius: 999px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      box-shadow:
+        0 16px 36px -10px rgba(14, 165, 233, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+      transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    }
+    .cta:hover {
+      transform: translateY(-2px);
+      background: var(--accent-400);
+      box-shadow:
+        0 22px 42px -10px rgba(14, 165, 233, 0.65),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+    .cta .arrow { font-size: 26px; line-height: 1; transform: translateY(-1px); }
+    .cta-row { display: flex; gap: 20px; flex-wrap: wrap; }
+    .cta.secondary {
+      background: transparent;
+      color: var(--fg-1);
+      border: 1px solid var(--border-3);
+      box-shadow: none;
+    }
+    .cta.secondary:hover {
+      background: var(--bg-3);
+      border-color: var(--accent-500);
+      color: var(--accent-300);
+    }
+
+    /* ---- Right-column visualizations on slides 3 / 4 ---- */
+    .viz-frame {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      background:
+        radial-gradient(60% 50% at 50% 40%, rgba(14, 165, 233, 0.10), transparent 70%),
+        linear-gradient(180deg, var(--bg-1), var(--bg-0));
+      border: 1px solid var(--border-1);
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+      padding: 40px;
+      box-sizing: border-box;
+      box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Mini knowledge-graph schematic — pure SVG, Neo4j-style pastel circles
+       matching the Live Graph page so the audience sees the connection. */
+    .viz-svg { width: 100%; height: 100%; display: block; }
+
+    /* Mini operator-UI schematic — wireframe of the 3-column layout. */
+    .ui-mock {
+      display: grid;
+      grid-template-columns: 1fr 1.6fr 1.4fr;
+      gap: 14px;
+      width: 100%;
+      height: 100%;
+    }
+    .ui-mock .col {
+      background: var(--bg-2);
+      border: 1px solid var(--border-2);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .ui-mock .col-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--fg-3);
+    }
+    .ui-mock .line {
+      height: 8px;
+      border-radius: 2px;
+      background: var(--bg-4);
+    }
+    .ui-mock .line.short { width: 60%; }
+    .ui-mock .line.long  { width: 92%; }
+    .ui-mock .line.accent { background: var(--accent-700); }
+    .ui-mock .video-block {
+      height: 110px;
+      background:
+        radial-gradient(50% 50% at 50% 50%, var(--bg-4), var(--bg-1));
+      border-radius: 6px;
+      border: 1px solid var(--border-2);
+    }
+    .ui-mock .chat-bubble {
+      background: var(--bg-3);
+      border-radius: 6px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .ui-mock .chat-bubble.user { background: var(--accent-700); }
+    .ui-mock .chat-bubble.user .line { background: rgba(255,255,255,0.4); }
+
+    /* Voice-pill at bottom-right of the UI mock — matches the real component */
+    .ui-mock-voice-pill {
+      position: absolute;
+      right: 24px; bottom: 24px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 16px 7px 7px;
+      background: var(--bg-3);
+      border: 1px solid var(--accent-500);
+      border-radius: 999px;
+      box-shadow: 0 8px 22px -8px rgba(14, 165, 233, 0.55);
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: var(--fg-1);
+    }
+    .ui-mock-voice-pill .dot {
+      width: 18px; height: 18px;
+      background: var(--accent-500);
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.18);
+    }
+  </style>
+</head>
+<body>
+
+  <deck-stage width="1920" height="1080">
+
+    <!-- ============================================================
+         SLIDE 1 — Title hero
+         ============================================================ -->
+    <section data-label="01 IndustReal">
+      <div class="slide slide-title">
+
+        <div class="title-band">
+          <div>
+            <div class="overline">IndustReal · STEMPIE assembly</div>
+            <h1 class="headline" style="margin-top: 32px;">
+              Graph-grounded AI for assembly tasks.
+            </h1>
+            <p class="lede" style="margin-top: 36px; max-width: 36ch;">
+              From XR-captured video, to a knowledge graph of the procedure,
+              to an operator-facing assistant — built on the
+              <strong style="color: var(--fg-1); font-weight: 500;">IndustReal</strong> dataset.
+            </p>
+          </div>
+
+          <div style="text-align: right;">
+            <div class="overline" style="color: var(--fg-3);">An introduction</div>
+            <div style="font-family: var(--font-display); font-size: 28px; color: var(--fg-2); margin-top: 12px;">
+              XR Event Grounding
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-img-wrap">
+          <img src="assets/industreal_overview.png"
+               alt="IndustReal STEMPIE assembly: parts, components, assembly, maintenance" />
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 2 — What's in the dataset
+         ============================================================ -->
+    <section data-label="02 Anatomy">
+      <div class="slide slide-anatomy">
+
+        <div class="slide-top">
+          <div class="overline">What's captured</div>
+          <div class="step-mark">
+            <div class="pip on"></div><div class="pip on"></div>
+            <div class="pip"></div><div class="pip"></div>
+          </div>
+        </div>
+
+        <div class="anatomy-inner">
+          <h2 class="headline">
+            A procedure, broken down four ways.
+          </h2>
+
+          <img src="assets/industreal_overview.png"
+               alt="Parts, components, assembly, maintenance"
+               class="anatomy-img" />
+
+          <div class="anatomy-cards">
+            <div class="anatomy-card">
+              <div class="num">01 · Parts</div>
+              <h3>Raw pieces</h3>
+              <p>The kit's atomic parts — nuts, washers, pins, wheels — as the operator unpacks them.</p>
+            </div>
+            <div class="anatomy-card">
+              <div class="num">02 · Components</div>
+              <h3>Subassemblies</h3>
+              <p>Pre-built groups: chassis pins, brackets, wheel assemblies — the units the operator actually installs.</p>
+            </div>
+            <div class="anatomy-card">
+              <div class="num">03 · Assembly</div>
+              <h3>The build</h3>
+              <p>A canonical target state reached by installing components in sequence — captured per clip in first-person XR video.</p>
+            </div>
+            <div class="anatomy-card">
+              <div class="num">04 · Maintenance</div>
+              <h3>Corrections</h3>
+              <p>Detect-and-remove sequences when something is installed wrong — the messy reality the AI must handle.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="slide-foot">
+          <div><strong>STEMPIE</strong> construction toy · ~30 test clips · first-person XR capture</div>
+          <div>02 / 04</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 3 — Live Graph (embedded)
+         ============================================================ -->
+    <section data-label="03 Live Graph">
+      <div class="slide slide-embed">
+
+        <div class="slide-top">
+          <div class="overline">From video, to graph</div>
+          <div class="step-mark">
+            <div class="pip on"></div><div class="pip on"></div>
+            <div class="pip on"></div><div class="pip"></div>
+          </div>
+        </div>
+
+        <div class="head-row">
+          <h2 class="headline">
+            Every step the operator does becomes a node.
+          </h2>
+          <div class="blurb">
+            <code style="color: var(--accent-300);">Clip · Goal · Phase · Step · Part</code><br/>
+            Watch the graph build itself as the assembly plays — nodes and
+            edges drawing in at the moment the operator performs each step.
+          </div>
+        </div>
+
+        <div class="embed-frame">
+          <!-- Real Live Graph view, deep-linked via hash routing -->
+          <iframe src="Platform.html#livegraph"
+                  title="Live Graph"
+                  loading="lazy"
+                  allow="autoplay; microphone"></iframe>
+        </div>
+
+        <div class="slide-foot">
+          <div>Press <strong>Play</strong> in the embedded view to start the build. Drag the PiP to reposition.</div>
+          <div>03 / 04</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 4 — Operator Interface (embedded)
+         ============================================================ -->
+    <section data-label="04 Operator interface">
+      <div class="slide slide-embed">
+
+        <div class="slide-top">
+          <div class="overline">From graph, to assistance</div>
+          <div class="step-mark">
+            <div class="pip on"></div><div class="pip on"></div>
+            <div class="pip on"></div><div class="pip on"></div>
+          </div>
+        </div>
+
+        <div class="head-row">
+          <h2 class="headline">
+            The graph answers the operator's questions.
+          </h2>
+          <div class="blurb">
+            <code style="color: var(--accent-300);">Text · Voice</code><br/>
+            The assistant retrieves a focused subgraph per question and answers
+            grounded in the dataset — by chat for reading, by voice for
+            hands-busy moments.
+          </div>
+        </div>
+
+        <div class="embed-frame">
+          <!-- Real Instruction view, deep-linked via hash routing -->
+          <iframe src="Platform.html#instruction"
+                  title="Operator interface"
+                  loading="lazy"
+                  allow="autoplay; microphone"></iframe>
+        </div>
+
+        <div class="slide-foot">
+          <div>Ask a question in the chat, or toggle <strong>Agent</strong> in the embedded topbar to talk.</div>
+          <div>04 / 04</div>
+        </div>
+      </div>
+    </section>
+
+  </deck-stage>
+
+  <!-- ====================================================================
+       Tweaks panel UI — hidden until host activates edit mode.
+       Hand-rolled (no React) since this is a static deck.
+       ==================================================================== -->
+  <div class="intro-tweaks" id="introTweaks">
+    <h5>Intro deck tweaks</h5>
+
+    <div class="twk-section">
+      <p class="twk-label">Theme</p>
+      <div class="twk-row" data-tweak="theme">
+        <button class="twk-pill" data-value="midnight">Midnight</button>
+        <button class="twk-pill" data-value="charcoal">Charcoal</button>
+        <button class="twk-pill" data-value="ink">Ink</button>
+      </div>
+    </div>
+
+    <div class="twk-section">
+      <p class="twk-label">Accent</p>
+      <div class="twk-row" data-tweak="accent">
+        <button class="twk-pill" data-value="sky">Sky</button>
+        <button class="twk-pill" data-value="amber">Amber</button>
+        <button class="twk-pill" data-value="emerald">Emerald</button>
+      </div>
+    </div>
+
+    <div class="twk-section">
+      <p class="twk-label">Background pattern</p>
+      <div class="twk-row" data-tweak="bg_pattern">
+        <button class="twk-pill" data-value="plain">Plain</button>
+        <button class="twk-pill" data-value="dotted">Dotted</button>
+        <button class="twk-pill" data-value="grid">Grid</button>
+      </div>
+    </div>
+
+    <div class="twk-section">
+      <p class="twk-label">Headline weight</p>
+      <div class="twk-row" data-tweak="headline_weight">
+        <button class="twk-pill" data-value="400">Regular</button>
+        <button class="twk-pill" data-value="500">Medium</button>
+        <button class="twk-pill" data-value="600">Semi-bold</button>
+      </div>
+    </div>
+
+    <div class="twk-section">
+      <p class="twk-label">Hero image (slides 1 · 2)</p>
+      <div class="twk-row" data-tweak="hero_treatment">
+        <button class="twk-pill" data-value="clean">Clean</button>
+        <button class="twk-pill" data-value="vignette">Vignette</button>
+        <button class="twk-pill" data-value="glow">Glow</button>
+      </div>
+    </div>
+
+    <div class="twk-section">
+      <p class="twk-label">Anatomy cards (slide 2)</p>
+      <div class="twk-row" data-tweak="card_style">
+        <button class="twk-pill" data-value="bordered">Bordered</button>
+        <button class="twk-pill" data-value="filled">Filled</button>
+        <button class="twk-pill" data-value="outline">Outline</button>
+      </div>
+    </div>
+
+    <div class="twk-section">
+      <p class="twk-label">Embed frame shadow (slides 3 · 4)</p>
+      <div class="twk-row" data-tweak="embed_shadow">
+        <button class="twk-pill" data-value="soft">Soft</button>
+        <button class="twk-pill" data-value="hard">Hard</button>
+        <button class="twk-pill" data-value="none">None</button>
+      </div>
+    </div>
+
+    <div class="twk-section">
+      <div class="twk-toggle" data-tweak="show_step_pips">
+        <span>Show step pips</span>
+        <div class="twk-switch"></div>
+      </div>
+    </div>
+
+    <div class="twk-section">
+      <div class="twk-toggle" data-tweak="show_slide_numbers">
+        <span>Show slide numbers</span>
+        <div class="twk-switch"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="deck-stage.js"></script>
+
+  <!-- Tweaks runtime: applies state to <body> classes, wires panel controls,
+       speaks the host postMessage protocol so the editor toolbar's Tweaks
+       button can open the panel and persist edits via __edit_mode_set_keys. -->
+  <script>
+  (function() {
+    var defaults = window.INTRO_TWEAK_DEFAULTS;
+    var STORAGE_KEY = 'intro.tweaks.v1';
+
+    function loadState() {
+      var s = Object.assign({}, defaults);
+      try {
+        var raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) Object.assign(s, JSON.parse(raw));
+      } catch (e) {}
+      return s;
+    }
+    var state = loadState();
+
+    function persist() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+      try {
+        window.parent.postMessage({ type: '__edit_mode_set_keys', keys: state }, '*');
+      } catch (e) {}
+    }
+
+    function apply() {
+      var body = document.body;
+      var classes = [
+        'theme-' + state.theme,
+        'accent-' + state.accent,
+        'pattern-' + state.bg_pattern,
+        'card-' + state.card_style,
+        'shadow-' + state.embed_shadow,
+        'hero-' + state.hero_treatment
+      ];
+      if (!state.show_step_pips)     classes.push('hide-step-pips');
+      if (!state.show_slide_numbers) classes.push('hide-slide-numbers');
+      var PRFX = ['theme-','accent-','pattern-','card-','shadow-','hero-','hide-step-pips','hide-slide-numbers'];
+      body.className = body.className.split(/\s+/)
+        .filter(function(c) { return !PRFX.some(function(p) { return c.indexOf(p) === 0; }); })
+        .concat(classes)
+        .join(' ');
+
+      document.querySelectorAll('.headline').forEach(function(el) {
+        el.style.fontWeight = String(state.headline_weight);
+      });
+
+      document.querySelectorAll('[data-tweak]').forEach(function(node) {
+        var key = node.getAttribute('data-tweak');
+        var v = state[key];
+        if (node.classList.contains('twk-toggle')) {
+          node.classList.toggle('on', !!v);
+        } else {
+          node.querySelectorAll('.twk-pill').forEach(function(pill) {
+            pill.classList.toggle('on', String(pill.getAttribute('data-value')) === String(v));
+          });
+        }
+      });
+    }
+
+    function setTweak(key, val) {
+      state[key] = val;
+      apply();
+      persist();
+    }
+
+    document.addEventListener('click', function(e) {
+      var pill = e.target.closest('.twk-pill');
+      if (pill) {
+        var group = pill.closest('[data-tweak]');
+        var key = group.getAttribute('data-tweak');
+        var val = pill.getAttribute('data-value');
+        if (key === 'headline_weight') val = Number(val);
+        setTweak(key, val);
+        return;
+      }
+      var toggle = e.target.closest('.twk-toggle');
+      if (toggle) {
+        var k = toggle.getAttribute('data-tweak');
+        setTweak(k, !state[k]);
+      }
+    });
+
+    window.addEventListener('message', function(e) {
+      var d = e.data;
+      if (!d || typeof d !== 'object') return;
+      if (d.type === '__activate_edit_mode')   document.body.classList.add('tweaks-open');
+      if (d.type === '__deactivate_edit_mode') document.body.classList.remove('tweaks-open');
+      if (d.type === '__edit_mode_keys' && d.keys && typeof d.keys === 'object') {
+        state = Object.assign({}, state, d.keys);
+        apply();
+      }
+    });
+
+    try {
+      window.parent.postMessage({
+        type: '__edit_mode_available',
+        keys: Object.keys(defaults)
+      }, '*');
+    } catch (e) {}
+
+    apply();
+  })();
+  </script>
+</body>
+</html>
+       ==================================================================== -->
+  <div class="intro-tweaks" id="introTweaks">
+    <h5>Intro deck tweaks</h5>
+
+    <div class="twk-section">
+      <p class="twk-label">Theme</p>
+      <div class="twk-row" data-tweak="theme">
+        <button class="twk-pill" data-value="midnight">Midnight</button>
+        <button class="twk-pill" data-value="charcoal">Charcoal</button>
+        <button class="twk-pill" data-value="ink">Ink</button>
+      </div>
+    </div>
+
+    <div class="twk-section">
+      <p class="twk-label">Accent</p>
+      <div class="twk-row" data-tweak="accent">
+        <button class="twk-pill" data-value="sky">Sky</button>
+        <button class="twk-pill" data-value="amber">Amber</button>
+        <button class="twk-pill" data-value="emerald">Emerald</button>
+      </div>
+    </div>
+
+    <div class="twk-section">
+      <p class="twk-label">Background pattern</p>
+      <div class="twk-row" data-tweak="bg_pattern">
+        <button class="twk-pill" data-value="plain">Plain</button>
+        <button class="twk-pill" data-value="dotted">Dotted</button>
+        <button class="twk-pill" data-value="grid">Grid</button>
+      </div>
+    </div>
+
+    <div class="twk-section">
+      <p class="twk-label">Headline weight</p>
+      <div class="twk-row" data-tweak="headline_weight">
+        <button class="twk-pill" data-value="400">Regular</button>
+        <button class="twk-pill" data-value="500">Medium</button>
+        <button class="twk-pill" data-value="600">Semi-bold</button>
+      </div>
+    </div>
+
+    <div class="twk-section">
+      <p class="twk-label">Hero image (slides 1 \u00b7 2)</p>
+      <div class="twk-row" data-tweak="hero_treatment">
+        <button class="twk-pill" data-value="clean">Clean</button>
+        <button class="twk-pill" data-value="vignette">Vignette</button>
+        <button class="twk-pill" data-value="glow">Glow</button>
+      </div>
+    </div>
+
+    <div class="twk-section">
+      <p class="twk-label">Anatomy cards (slide 2)</p>
+      <div class="twk-row" data-tweak="card_style">
+        <button class="twk-pill" data-value="bordered">Bordered</button>
+        <button class="twk-pill" data-value="filled">Filled</button>
+        <button class="twk-pill" data-value="outline">Outline</button>
+      </div>
+    </div>
+
+    <div class="twk-section">
+      <p class="twk-label">Embed frame shadow (slides 3 \u00b7 4)</p>
+      <div class="twk-row" data-tweak="embed_shadow">
+        <button class="twk-pill" data-value="soft">Soft</button>
+        <button class="twk-pill" data-value="hard">Hard</button>
+        <button class="twk-pill" data-value="none">None</button>
+      </div>
+    </div>
+
+    <div class="twk-section">
+      <div class="twk-toggle" data-tweak="show_step_pips">
+        <span>Show step pips</span>
+        <div class="twk-switch"></div>
+      </div>
+    </div>
+
+    <div class="twk-section">
+      <div class="twk-toggle" data-tweak="show_slide_numbers">
+        <span>Show slide numbers</span>
+        <div class="twk-switch"></div>
+      </div>
+    </div>
+</body>
+</html>

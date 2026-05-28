@@ -22,6 +22,8 @@
   let nextPlayAt    = 0;
   let outRate       = 16000; // filled from conversation_initiation_metadata
   let speakTimer    = null;  // clears when audio stops arriving → switches back to listening
+  let serverMsgCount = 0;    // total non-ping server messages this session
+  let stalenessWarn = null;  // setTimeout handle for the "no response" warning
 
   // ── Codec helpers ────────────────────────────────────────────────────────
 
@@ -97,27 +99,93 @@
   // ── Microphone ────────────────────────────────────────────────────────────
 
   async function startMic(sendChunk) {
-    // Disable all browser-side audio processing so ElevenLabs receives the
-    // raw signal and can run its own VAD / noise suppression on the server.
+    // Enable the browser's full audio pipeline. The original code disabled
+    // these on the theory that ElevenLabs would do its own processing
+    // server-side — but echo cancellation specifically REQUIRES access to
+    // the local playback signal (what we're sending to the speakers), which
+    // only the browser has. Without it, the mic picks up the agent's own
+    // voice and the server transcribes it as user input, creating an
+    // infinite feedback loop ("agent hearing itself").
+    //
+    //   echoCancellation: cancels what we're playing out of the speakers
+    //   noiseSuppression: drops fan/HVAC/background hiss
+    //   autoGainControl:  normalizes mic level so soft speech isn't lost
     micStream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     });
     const src  = audioCtx.createMediaStreamSource(micStream);
     // 2048 samples ≈ 46 ms chunks at 44.1 kHz — smaller and more frequent than 4096.
     scriptNode = audioCtx.createScriptProcessor(2048, 1, 1);
+
+    // Muted sink — ScriptProcessor needs *something* connected downstream or
+    // Chrome stops firing onaudioprocess. Connecting directly to destination
+    // causes some browsers to passthrough the (zeroed) output buffer at low
+    // volume; pinning a GainNode at 0 guarantees silence with no risk of
+    // echo or feedback into the mic.
+    const silentSink = audioCtx.createGain();
+    silentSink.gain.value = 0;
+    silentSink.connect(audioCtx.destination);
+
     let chunkCount = 0;
+    let peakWindow = 0;        // peak abs sample seen in the last N chunks
+    let silentChunks = 0;      // running counter for the silence warning
+    let suppressedChunks = 0;  // chunks skipped because the agent is speaking
     scriptNode.onaudioprocess = (e) => {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+      // ----- Half-duplex guard -----------------------------------------
+      // While the agent is actively speaking (i.e. we're playing back audio
+      // that ElevenLabs sent), DO NOT forward mic chunks. Two reasons:
+      //   1. Belt-and-suspenders defense against feedback if browser echo
+      //      cancellation misses something (different mics / speakers vary).
+      //   2. Bandwidth: there's no point streaming hundreds of chunks the
+      //      server will just classify as cross-talk while we're playing.
+      // We still keep the chunk counter / peak meter going for diagnostics.
+      const agentSpeaking = !!speakTimer;
+
       const raw = e.inputBuffer.getChannelData(0);
-      const ds  = resample(raw, audioCtx.sampleRate, 16000);
+
+      // Measure peak level on the RAW input so the log reflects what the mic
+      // actually delivered (resampling can hide near-zero levels).
+      let peak = 0;
+      for (let i = 0; i < raw.length; i++) {
+        const a = Math.abs(raw[i]);
+        if (a > peak) peak = a;
+      }
+      if (peak > peakWindow) peakWindow = peak;
+      if (peak < 0.005) silentChunks++; else silentChunks = 0;
+
+      if (agentSpeaking) {
+        suppressedChunks++;
+        if (suppressedChunks === 1) {
+          console.log('[ConvAgent] mic muted (agent speaking)');
+        }
+        return; // do not send to server
+      } else if (suppressedChunks > 0) {
+        console.log(`[ConvAgent] mic unmuted (suppressed ${suppressedChunks} chunks while agent spoke)`);
+        suppressedChunks = 0;
+      }
+
+      const ds = resample(raw, audioCtx.sampleRate, 16000);
       sendChunk(u8ToB64(f32ToPcm16(ds)));
       chunkCount++;
       if (chunkCount === 1 || chunkCount % 50 === 0) {
-        console.log(`[ConvAgent] mic chunks sent: ${chunkCount} (rate: ${audioCtx.sampleRate} Hz)`);
+        console.log(`[ConvAgent] mic chunks sent: ${chunkCount} (rate: ${audioCtx.sampleRate} Hz, peak: ${peakWindow.toFixed(3)})`);
+        peakWindow = 0;
+      }
+      // Surface a one-shot warning if we've been streaming nothing but silence
+      // for ~5s — this is the #1 reason ElevenLabs closes with code 1005.
+      if (silentChunks === 100) {
+        console.warn(
+          '[ConvAgent] microphone has been silent for ~5s. ' +
+          'Check the OS mic input level, the selected input device, and that ' +
+          'the browser tab actually has mic permission. The agent will ' +
+          'eventually idle-close (WS code 1005) if no speech is detected.'
+        );
       }
     };
     src.connect(scriptNode);
-    scriptNode.connect(audioCtx.destination); // Chrome requires a live destination to keep the graph active
+    scriptNode.connect(silentSink); // graph stays active; output is forced to zero
     console.log('[ConvAgent] mic started, browser sample rate:', audioCtx.sampleRate);
   }
 
@@ -141,6 +209,31 @@
     // Log every non-trivial message so unexpected formats are visible in the console.
     if (msg.type && msg.type !== 'ping' && !msg.type.startsWith('internal_')) {
       console.log('[ConvAgent] ←', msg.type, msg);
+      serverMsgCount++;
+      // After the very first non-ping message (almost always
+      // conversation_initiation_metadata), arm a watchdog: if we haven't
+      // heard back from the agent within ~20s of starting to stream audio,
+      // something is wrong upstream (agent config, quota, network).
+      if (msg.type === 'conversation_initiation_metadata') {
+        if (stalenessWarn) clearTimeout(stalenessWarn);
+        stalenessWarn = setTimeout(() => {
+          if (serverMsgCount <= 1 && ws?.readyState === WebSocket.OPEN) {
+            console.error(
+              '[ConvAgent] 20s of audio streamed with NO server response ' +
+              '(no user_transcript, no agent_response, no audio). ' +
+              'The mic is working (see peak levels above) so the issue is ' +
+              'upstream. Check: 1) the Agent ID matches the API key\'s ' +
+              'account, 2) the agent is published and not paused in the ' +
+              'ElevenLabs dashboard, 3) account has remaining ConvAI ' +
+              'minutes, 4) agent language matches what you\'re speaking.'
+            );
+            cbs.onError?.('Agent silent for 20s — see console for diagnostics.');
+          }
+        }, 20000);
+      } else if (msg.type === 'user_transcript' || msg.type === 'agent_response' || msg.type === 'audio') {
+        // Real activity — cancel the watchdog.
+        if (stalenessWarn) { clearTimeout(stalenessWarn); stalenessWarn = null; }
+      }
     }
 
     switch (msg.type) {
@@ -300,6 +393,7 @@
     ws.onopen = () => {
       const initMsg = { type: 'conversation_initiation_client_data', dynamic_variables: dynamicVars };
       console.log('[ConvAgent] → sending initiation, dynamic_vars keys:', Object.keys(dynamicVars));
+      serverMsgCount = 0;
       ws.send(JSON.stringify(initMsg));
     };
 
@@ -312,7 +406,35 @@
     };
 
     ws.onclose = (ev) => {
-      console.log('[ConvAgent] WebSocket closed, code:', ev.code, 'reason:', ev.reason);
+      console.log('[ConvAgent] WebSocket closed, code:', ev.code, 'reason:', ev.reason,
+                  'serverMsgCount:', serverMsgCount);
+      if (stalenessWarn) { clearTimeout(stalenessWarn); stalenessWarn = null; }
+      // Code 1005 = "no status received" — i.e. the server dropped the
+      // connection without sending a close frame. Two flavors:
+      //   • serverMsgCount <= 1: we only got the init message, then silence.
+      //     The agent never engaged — config / auth / quota issue.
+      //   • serverMsgCount > 1: we had a conversation that then stalled.
+      //     Usually idle timeout from no user speech.
+      if (ev.code === 1005 && !ev.reason) {
+        if (serverMsgCount <= 1) {
+          console.warn(
+            '[ConvAgent] Server closed without ever responding to the audio. ' +
+            'Most common causes: (1) Agent ID and API key are from different ' +
+            'ElevenLabs accounts; (2) the agent is paused / unpublished; ' +
+            '(3) account is out of ConvAI minutes. ' +
+            'Open the ElevenLabs dashboard → your agent → "Conversations" tab; ' +
+            'if this session does not appear there at all, it\'s an auth issue.'
+          );
+          onError?.('Agent never responded — see console for likely causes.');
+        } else {
+          console.warn(
+            '[ConvAgent] Connection idle-closed by ElevenLabs (no status). ' +
+            'The conversation was working but went quiet. This is usually a ' +
+            'normal idle timeout.'
+          );
+          onError?.('Agent disconnected (idle timeout).');
+        }
+      }
       stopMic();
       if (audioCtx) { try { audioCtx.close(); } catch {} audioCtx = null; }
       ws = null;
