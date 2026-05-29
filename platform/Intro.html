@@ -1019,7 +1019,7 @@
 
         <div class="slide-foot">
           <div>Press <strong>Play</strong> in the embedded view to start the build.</div>
-          <div>06 / 13</div>
+          <div>06 / 12</div>
         </div>
       </div>
     </section>
@@ -1048,14 +1048,8 @@
       </div>
     </section>
 
-    <section data-label="10 Constraint evidence">
-      <div class="slide slide-eval">
-        <img src="assets/eval04_C.png" alt="Constraint evidence" />
-        <div class="caption">Constraint evidence</div>
-      </div>
-    </section>
-
-    <section data-label="11 Step dependencies">
+    
+        <section data-label="10 Step dependencies">
       <div class="slide slide-eval">
         <img src="assets/eval04_B.png" alt="Step dependencies" />
         <div class="caption">Step dependencies</div>
@@ -1065,7 +1059,7 @@
     <!-- ============================================================
          SLIDE 12 — PPTX slide 5, copy corrected via overlay (5 boxes)
          ============================================================ -->
-    <section data-label="12 Value of validated procedure">
+    <section data-label="11 Value of validated procedure">
       <div class="slide slide-fullbleed">
         <img src="assets/intro_slide5.png" alt="The Value of Validated Procedure" />
       </div>
@@ -1074,7 +1068,7 @@
     <!-- ============================================================
          SLIDE 13 — Operator Interface (embedded)
          ============================================================ -->
-    <section data-label="13 Operator interface">
+    <section data-label="12 Operator interface">
       <div class="slide slide-embed">
 
         <div class="slide-top">
@@ -1100,7 +1094,7 @@
 
         <div class="slide-foot">
           <div>Ask a question in the chat, or toggle <strong>Agent</strong> in the embedded topbar to talk.</div>
-          <div>13 / 13</div>
+          <div>12 / 12</div>
         </div>
       </div>
     </section>
@@ -1318,6 +1312,9 @@
     });
 
     // Fullscreen helper used by both the panel button and the F key.
+    // Also hides the deck's thumbnail rail while presenting (via the
+    // component's `no-rail` attribute) and restores it on exit, so a
+    // fullscreen presentation shows only the slide — not the slide list.
     function toggleFullscreen() {
       try {
         if (document.fullscreenElement || document.webkitFullscreenElement) {
@@ -1328,6 +1325,18 @@
         }
       } catch (e) { console.warn('Fullscreen failed:', e); }
     }
+
+    // Keep the rail in sync with fullscreen state regardless of how it was
+    // entered/exited (F key, panel button, or the browser's own Esc).
+    function syncRailToFullscreen() {
+      var deck = document.querySelector('deck-stage');
+      if (!deck) return;
+      var fs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      if (fs) deck.setAttribute('no-rail', '');
+      else deck.removeAttribute('no-rail');
+    }
+    document.addEventListener('fullscreenchange', syncRailToFullscreen);
+    document.addEventListener('webkitfullscreenchange', syncRailToFullscreen);
 
     // Keyboard shortcuts:
     //   F   — toggle fullscreen
